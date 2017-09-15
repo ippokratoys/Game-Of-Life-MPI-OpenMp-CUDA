@@ -20,7 +20,7 @@ int main(int argc, char  *argv[]) {
   double tempBlocksColAndRows;
   FILE *fp;
 
-  srand ( time(NULL) );
+  srand ( 0 );
 
 
   fp=fopen("input.txt","r");
@@ -40,7 +40,7 @@ int main(int argc, char  *argv[]) {
 
   //find my column and my row
   if(myrank==0){
-    printf("Num of Processes:%d\nNum of dimensions:%d\nBlocks rows and columns:%d\nEach Block is %dX%d\n",world_size,dimensions,BlocksColAndRows,blockDimension,blockDimension);
+    // printf("Num of Processes:%d\nNum of dimensions:%d\nBlocks rows and columns:%d\nEach Block is %dX%d\n",world_size,dimensions,BlocksColAndRows,blockDimension,blockDimension);
     mycolumn=myrow=0;
   }else{
     int tempcol=0,temprow=0;
@@ -58,7 +58,7 @@ int main(int argc, char  *argv[]) {
       }
     }
   }
-  printf("My rank is %d:\nMy column is %d My row is %d \n",myrank,mycolumn,myrow );
+  // printf("My rank is %d:\nMy column is %d My row is %d \n",myrank,mycolumn,myrow );
 
   //initialize the block
   char** block;
@@ -86,7 +86,12 @@ int main(int argc, char  *argv[]) {
   //calculate the inside
   int neighbors=0,changed=0;
   for(i=1;i<blockDimension-1;i++){
+    if(myrank==0){
+      printf("%s\n",block[i]);
+    }
     for(j=1;j<blockDimension-1;j++){
+        neighbors=0;
+        changed=0;
         if(block[i-1][j-1]=='X'){
           neighbors++;
         }else if(block[i-1][j]=='X'){
@@ -104,7 +109,6 @@ int main(int argc, char  *argv[]) {
         }else if(block[i+1][j+1]=='X'){
           neighbors++;
         }
-        changed=0;
         if(block[i][j]=='X'){
           changed=1;
           if(neighbors<=1){
@@ -130,6 +134,12 @@ int main(int argc, char  *argv[]) {
       }else if(change[i][j]=='L'){
         block[i][j]='X';
       }
+    }
+  }
+  printf("\n\n");
+  for(i=1;i<blockDimension-1;i++){
+    if(myrank==0){
+      printf("%s\n",block[i]);
     }
   }
 
