@@ -3,6 +3,20 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define ALIVE 'X'
+#define DEAD 'O'
+
+void print_board(char** board,int size,FILE* stream){
+    int i,j;
+    for ( i = 0; i < size; i++) {
+        for ( j = 0; j < size; j++) {
+            putc(board[i][j], stream);
+        }
+        putc('\n', stream);
+    }
+
+}
+
 double sqroot(double square)
 {
     double root=square/3;
@@ -73,18 +87,19 @@ int main(int argc, char  *argv[]) {
   //take random vars
   for(i=0;i<blockDimension;i++){
     for(j=0;j<blockDimension;j++){
-      random_number = rand()%2;
+      random_number = rand()%10;
       change[i][j]='N';
       if(random_number==0){
-        block[i][j]='O';
+        block[i][j]=ALIVE;
       }else{
-        block[i][j]='X';
+        block[i][j]=DEAD;
       }
     }
   }
 
   //calculate the inside
   int neighbors=0,changed=0;
+  printf("My first update\n");
   for(i=1;i<blockDimension-1;i++){
     if(myrank==0){
       printf("%s\n",block[i]);
@@ -92,24 +107,24 @@ int main(int argc, char  *argv[]) {
     for(j=1;j<blockDimension-1;j++){
         neighbors=0;
         changed=0;
-        if(block[i-1][j-1]=='X'){
+        if(block[i-1][j-1]==ALIVE){
           neighbors++;
-        }else if(block[i-1][j]=='X'){
+        }else if(block[i-1][j]==ALIVE){
           neighbors++;
-        }else if(block[i-1][j+1]=='X'){
+        }else if(block[i-1][j+1]==ALIVE){
           neighbors++;
-        }else if(block[i][j-1]=='X'){
+        }else if(block[i][j-1]==ALIVE){
           neighbors++;
-        }else if(block[i][j+1]=='X'){
+        }else if(block[i][j+1]==ALIVE){
           neighbors++;
-        }else if(block[i+1][j-1]=='X'){
+        }else if(block[i+1][j-1]==ALIVE){
           neighbors++;
-        }else if(block[i+1][j]=='X'){
+        }else if(block[i+1][j]==ALIVE){
           neighbors++;
-        }else if(block[i+1][j+1]=='X'){
+        }else if(block[i+1][j+1]==ALIVE){
           neighbors++;
         }
-        if(block[i][j]=='X'){
+        if(block[i][j]==ALIVE){
           changed=1;
           if(neighbors<=1){
             change[i][j]='D';
@@ -130,17 +145,15 @@ int main(int argc, char  *argv[]) {
   for(i=1;i<blockDimension-1;i++){
     for(j=1;j<blockDimension-1;j++){
       if(change[i][j]=='D'){
-        block[i][j]='O';
+        block[i][j]=DEAD;
       }else if(change[i][j]=='L'){
-        block[i][j]='X';
+        block[i][j]=ALIVE;
       }
     }
   }
   printf("\n\n");
-  for(i=1;i<blockDimension-1;i++){
-    if(myrank==0){
-      printf("%s\n",block[i]);
-    }
+  if(myrank==0){
+      print_board(block,blockDimension,stdout);
   }
 
   for(i=0;i<blockDimension;i++){
