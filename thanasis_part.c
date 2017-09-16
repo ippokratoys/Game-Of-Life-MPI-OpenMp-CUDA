@@ -6,6 +6,17 @@
 #define ALIVE 'X'
 #define DEAD 'O'
 #define DEBUG 1
+void print_board(int** board,int size,FILE* stream){
+    int i,j;
+    for ( i = 0; i < size; i++) {
+        for ( j = 0; j < size; j++) {
+            fprintf(stream,"%3d ", board[i][j]);
+            // putc(board[i][j], stream);
+        }
+        putc('\n', stream);
+    }
+
+}
 
 int main(int argc, char  *argv[]) {
     int retun_val;//what fun returns
@@ -21,11 +32,22 @@ int main(int argc, char  *argv[]) {
     int number_of_process;
     MPI_Init(&argc,&argv);
 
+
 // check how many process we have
     MPI_Comm_size(MPI_COMM_WORLD, &number_of_process);
     int blocks_per_line = sqrt(number_of_process);
 
     int coord[2];
+
+//create the datypes for send/recv the matrix
+    MPI_Datatype  oneRow , oneCol;
+    // it's 9 blocks     one element in each block    number of elements beetwen blocks
+    MPI_Type_vector(8, 1, 10, MPI_INT , &oneCol );
+    MPI_Type_vector(8, 1, 1, MPI_INT , &oneRow );
+    MPI_Type_commit (&oneRow);
+    MPI_Type_commit (&oneCol);
+
+
 //bulit the new cartesian communicator
     MPI_Comm cartesian_comm;//the communicator we are going to use
     int dim[2];//calculate the dimensions
@@ -91,9 +113,49 @@ int main(int argc, char  *argv[]) {
         printf("up_right      %d\n", up_right);
         printf("right_id      %d\n", right_id);
         printf("down_right_id %d\n", down_right_id);
+        fflush(stdout);
+    }
+    MPI_Barrier( MPI_COMM_WORLD);
+    int** board=malloc(sizeof(int*)*10);
+    board[0]=malloc(sizeof(int)*10*10);
+
+    int** empty_board=malloc(sizeof(int*)*10);
+    empty_board[0]=malloc(sizeof(int)*10*10);
+    int i,j;
+
+    for ( i = 0; i < 10; i++) {
+        board[i]=&board[0][i*10];
+        empty_board[i]=&empty_board[0][i*10];
+    }
+
+    for ( i = 0; i < 10; i++) {
+        // board[i]=malloc(sizeof(int)*10);
+        // empty_board[i]=malloc(sizeof(int)*10);
+        for ( j = 0; j < 10; j++) {
+            board[i][j]=i*10+j;
+            empty_board[i][j]=-1;
+        }
+    }
+    if(my_rank==0){
+        print_board(board,10,stdout);
+        fflush(stdout);
+    }
+
+    MPI_Barrier( MPI_COMM_WORLD);
+    if(my_rank==0){
+        MPI_Send(&board[1][0], 1, oneCol , right_id , 11 , cartesian_comm );//send of the first col
+        // MPI_Send(&board[0][1], 1, oneRow , right_id , 11 , cartesian_comm );//send of the first row
+    }
+    if(left_id==0){
+        MPI_Recv(&empty_board[1][0],1,oneCol,left_id,11,cartesian_comm,MPI_STATUS_IGNORE);
+        // MPI_Recv(&empty_board[0][1],1,oneRow,left_id,11,cartesian_comm,MPI_STATUS_IGNORE);
+        printf("\nrecieved\n");
+        fflush(stdout);
+        print_board(empty_board, 10, stdout);
+        printf("\n end \n");
+        fflush(stdout);
     }
 #endif
-
 // my_coord[2]       : this process coordinates
 // ***_id            : the id of the *** process is computed
 // my_rank           : the rank of the current process
