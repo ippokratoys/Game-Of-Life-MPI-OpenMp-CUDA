@@ -63,8 +63,8 @@ int main(int argc, char  *argv[]) {
 
     MPI_Datatype  oneRow , oneCol;
     // it's 9 blocks     one element in each block    number of elements beetwen blocks
-    MPI_Type_vector(8, 1, blockDimension, MPI_INT , &oneCol );
-    MPI_Type_vector(8, 1, 1, MPI_INT , &oneRow );
+    MPI_Type_vector(blockDimension, 1, blockDimension+2, MPI_CHAR  , &oneCol );
+    MPI_Type_vector(blockDimension, 1, 1, MPI_CHAR  , &oneRow );
     MPI_Type_commit (&oneRow);
     MPI_Type_commit (&oneCol);
 
@@ -147,17 +147,31 @@ int main(int argc, char  *argv[]) {
     char** newblock;
     char** empty_block;
     int random_number;
-    block=malloc(sizeof(char*)*blockDimension);
-    newblock=malloc(sizeof(char*)*blockDimension);
-    empty_block=malloc(sizeof(char*)*blockDimension);
-    for(i=0;i<blockDimension;i++){
-        block[i]=malloc(sizeof(char)*blockDimension);
-        newblock[i]=malloc(sizeof(char)*blockDimension);
-        empty_block[i]=malloc(sizeof(char)*blockDimension);
+    block=malloc(sizeof(char*)*(blockDimension+2));
+    newblock=malloc(sizeof(char*)*(blockDimension+2));
+    empty_block=malloc(sizeof(char*)*(blockDimension+2));
+    //we are allocating memomory in a special way, think about it
+    block[0]=malloc(sizeof(char)*(blockDimension+2)*(blockDimension+2));
+    newblock[0]=malloc(sizeof(char)*(blockDimension+2)*(blockDimension+2));
+    empty_block[0]=malloc(sizeof(char)*(blockDimension+2)*(blockDimension+2));
+    for(i=0;i<blockDimension+2;i++){
+        block[i]=&block[0][i*(blockDimension+2)];
+        newblock[i]=&newblock[0][i*(blockDimension+2)];
+        empty_block[i]=&empty_block[0][i*(blockDimension+2)];
     }
     //take random vars
-    for(i=0;i<blockDimension;i++){
-        for(j=0;j<blockDimension;j++){
+
+    //initialize the board's with 'q'
+    for(i=0;i<blockDimension+2;i++){
+        for(j=0;j<blockDimension+2;j++){
+            block[i][j]='q';
+            newblock[i][j]='q';
+            empty_block[i][j]='q';
+        }
+    }
+
+    for(i=1;i<blockDimension+1;i++){
+        for(j=1;j<blockDimension+1;j++){
             random_number = rand()%10;
             empty_block[i][j]='q';
             if(random_number==0){
@@ -169,21 +183,26 @@ int main(int argc, char  *argv[]) {
     }
 
     if(my_rank==0){
-        print_board(block,blockDimension,stdout);
+        print_board(block,blockDimension+2,stdout);
         fflush(stdout);
     }
 
     MPI_Barrier( MPI_COMM_WORLD);
     if(my_rank==0){
-        MPI_Send(&block[1][0], 1, oneCol , right_id , blockDimension+1 , cartesian_comm );//send of the first col
+        MPI_Send(&block[1][1], 1, oneCol , right_id , blockDimension+1 , cartesian_comm );//send of the first col
         // MPI_Send(&block[0][1], 1, oneRow , right_id , 11 , cartesian_comm );//send of the first row
     }
     if(left_id==0){
-        MPI_Recv(&empty_block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
+        sleep(2);
+        printf("\nI used to have\n");
+        print_board(block, blockDimension+2, stdout);
+        fflush(stdout);
+
+        MPI_Recv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
         // MPI_Recv(&empty_block[0][1],1,oneRow,left_id,11,cartesian_comm,MPI_STATUS_IGNORE);
         printf("\nrecieved\n");
         fflush(stdout);
-        print_board(empty_block, blockDimension, stdout);
+        print_board(block, blockDimension+2, stdout);
         printf("\n end \n");
         fflush(stdout);
     }
@@ -191,8 +210,8 @@ int main(int argc, char  *argv[]) {
     //calculate the inside
     int neighbors=0;
     // printf("My first update\n");
-    for(i=1;i<blockDimension-1;i++){
-        for(j=1;j<blockDimension-1;j++){
+    for(i=2;i<blockDimension-2;i++){
+        for(j=2;j<blockDimension-2;j++){
             neighbors=0;
             if(block[i-1][j-1]==ALIVE)neighbors++;
             if(block[i-1][j]==ALIVE)neighbors++;
@@ -229,10 +248,10 @@ int main(int argc, char  *argv[]) {
     // }
 
 
-    for(i=0;i<blockDimension;i++){
-        free(block[i]);
-    }
-    free(block);
+    // for(i=0;i<blockDimension;i++){
+    //     free(block[i]);
+    // }
+    // free(block);
     fclose(fp);
     MPI_Finalize();
     return 0;
