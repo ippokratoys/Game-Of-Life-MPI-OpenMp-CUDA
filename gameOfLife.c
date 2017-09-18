@@ -47,7 +47,6 @@ int main(int argc, char  *argv[]) {
     int left_id,right_id;
     int down_left_id,down_id,down_right_id;
 
-    srand ( 0 );
     fp=fopen("input.txt","r");
     if(fp==NULL){
         perror("Fail to open the file");
@@ -83,6 +82,7 @@ int main(int argc, char  *argv[]) {
     //get my ranks
     MPI_Comm_rank(cartesian_comm,&my_rank);//find my rank in this communicator
     MPI_Cart_coords(cartesian_comm, my_rank, 2, my_coord);//and find my position on the grid
+    srand ( my_rank+23 );
 
 #if DEBUG==1
     printf("Rank %2d coordinates are %1d %1d\n", my_rank, my_coord[0], my_coord[1]);fflush(stdout);
@@ -187,31 +187,41 @@ int main(int argc, char  *argv[]) {
         fflush(stdout);
     }
 
-    MPI_Barrier( MPI_COMM_WORLD);
-    if(my_rank==0){
-        MPI_Send(&block[1][1], 1, oneCol , right_id , blockDimension+1 , cartesian_comm );//send of the first col
-        // MPI_Send(&block[0][1], 1, oneRow , right_id , 11 , cartesian_comm );//send of the first row
-    }
-    if(left_id==0){
-        sleep(2);
-        printf("\nI used to have\n");
-        print_board(block, blockDimension+2, stdout);
-        fflush(stdout);
 
-        MPI_Recv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
-        // MPI_Recv(&empty_block[0][1],1,oneRow,left_id,11,cartesian_comm,MPI_STATUS_IGNORE);
-        printf("\nrecieved\n");
-        fflush(stdout);
-        print_board(block, blockDimension+2, stdout);
-        printf("\n end \n");
+
+    MPI_Barrier( MPI_COMM_WORLD);
+    MPI_Request send_requests[8];
+    MPI_Isend(&block[1][1], 1, oneCol , right_id , blockDimension+1 , cartesian_comm,&send_requests[0] );//send of the first col
+    MPI_Isend(&block[1][blockDimension],1,oneCol,left_id,blockDimension+1,cartesian_comm,&send_requests[1]);
+    MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&send_requests[2]);
+    MPI_Isend(&block[1][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&send_requests[3]);
+    MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,1,cartesian_comm,&send_requests[4]);
+    MPI_Isend(&block[1][blockDimension],1,MPI_CHAR,up_right,1,cartesian_comm,&send_requests[5]);
+    MPI_Isend(&block[blockDimension][blockDimension],1,MPI_CHAR,down_right_id,1,cartesian_comm,&send_requests[6]);
+    MPI_Isend(&block[blockDimension][1],1,MPI_CHAR,down_left_id,1,cartesian_comm,&send_requests[7]);
+
+    sleep(2);
+
+    MPI_Recv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
+    MPI_Recv(&block[1][blockDimension+1],1,oneCol,right_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
+    MPI_Recv(&block[0][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
+    MPI_Recv(&block[blockDimension+1][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
+    MPI_Recv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,1,cartesian_comm,MPI_STATUS_IGNORE);
+    MPI_Recv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);
+    MPI_Recv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,1,cartesian_comm,MPI_STATUS_IGNORE);
+    MPI_Recv(&block[0][0],1,MPI_CHAR,up_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);
+
+    if(my_rank==0){
+        printf("\n\n");
+        print_board(block,blockDimension+2,stdout);
         fflush(stdout);
     }
 
     //calculate the inside
     int neighbors=0;
     // printf("My first update\n");
-    for(i=2;i<blockDimension-2;i++){
-        for(j=2;j<blockDimension-2;j++){
+    for(i=2;i<blockDimension;i++){
+        for(j=2;j<blockDimension;j++){
             neighbors=0;
             if(block[i-1][j-1]==ALIVE)neighbors++;
             if(block[i-1][j]==ALIVE)neighbors++;
@@ -239,13 +249,39 @@ int main(int argc, char  *argv[]) {
         }
     }
 
+    for(i=1;i<blockDimension+1;i++){
+        neighbors=0;
+        if(block[0][i-1]==ALIVE)neighbors++;
+        if(block[0][i]==ALIVE)neighbors++;
+        if(block[0][i+1]==ALIVE)neighbors++;
+        if(block[1][i-1]==ALIVE)neighbors++;
+        if(block[1][i+1]==ALIVE)neighbors++;
+        if(block[2][i-1]==ALIVE)neighbors++;
+        if(block[2][i]==ALIVE)neighbors++;
+        if(block[2][i+1]==ALIVE)neighbors++;
 
-    // if(my_rank==0){
-    //     printf("\n\n");
-    //     print_board(block,blockDimension,stdout);
-    //     printf("\n\n");
-    //     print_board_inside(newblock,blockDimension,stdout);
-    // }
+        if(block[1][j]==ALIVE){
+            if(neighbors<=1){
+                newblock[1][i]=DEAD;
+            }else if(neighbors==2 || neighbors==3){
+                newblock[1][i]=ALIVE;
+            }else if(neighbors>3){
+                newblock[1][i]=DEAD;
+            }
+        }else{
+            if(neighbors==3){
+                newblock[1][i]=ALIVE;
+            }else{
+                newblock[1][i]=DEAD;
+            }
+        }
+    }
+
+    if(my_rank==0){
+        printf("\n\n");
+        print_board(newblock,blockDimension+2,stdout);
+        printf("\n\n");
+    }
 
 
     // for(i=0;i<blockDimension;i++){
