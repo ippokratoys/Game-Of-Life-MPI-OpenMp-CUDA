@@ -8,7 +8,7 @@
 #define DEAD 'O'
 #define EMPTY '*'
 #define DEBUG 1
-#define TOTAL_LOOPS 1000
+#define TOTAL_LOOPS 1
 #define CHECK_FOR_CHANGE 0
 
 void print_board(char** board,int size,FILE* stream){
