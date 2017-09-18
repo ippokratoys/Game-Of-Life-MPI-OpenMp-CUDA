@@ -8,6 +8,8 @@
 #define DEAD 'O'
 #define EMPTY '*'
 #define DEBUG 1
+#define TOTAL_LOOPS 1000
+#define CHECK_FOR_CHANGE 0
 
 void print_board(char** board,int size,FILE* stream){
     int i,j;
@@ -189,139 +191,158 @@ int main(int argc, char  *argv[]) {
     }
 
 
-
+    int cur_loop = 0;
+    int changed = 0;//a variable to know if somthing has change
     MPI_Barrier( MPI_COMM_WORLD);
-    MPI_Request send_requests[8];
-    MPI_Isend(&block[1][1], 1, oneCol , right_id , blockDimension+1 , cartesian_comm,&send_requests[0] );//send of the first col
-    MPI_Isend(&block[1][blockDimension],1,oneCol,left_id,blockDimension+1,cartesian_comm,&send_requests[1]);//send of the last col
-    MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&send_requests[2]);//send of the last line
-    MPI_Isend(&block[1][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&send_requests[3]);//send of the first line
-    MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,1,cartesian_comm,&send_requests[4]);//send of the up left
-    MPI_Isend(&block[1][blockDimension],1,MPI_CHAR,up_right,1,cartesian_comm,&send_requests[5]);//send of the up right
-    MPI_Isend(&block[blockDimension][blockDimension],1,MPI_CHAR,down_right_id,1,cartesian_comm,&send_requests[6]);//send of the down right
-    MPI_Isend(&block[blockDimension][1],1,MPI_CHAR,down_left_id,1,cartesian_comm,&send_requests[7]);//send of the down left
+    for (cur_loop = 0; cur_loop < TOTAL_LOOPS; cur_loop++) {
+        changed=0;//nothing has change
+        MPI_Request send_requests[8];
+        MPI_Isend(&block[1][1], 1, oneCol , right_id , blockDimension+1 , cartesian_comm,&send_requests[0] );//send of the first col
+        MPI_Isend(&block[1][blockDimension],1,oneCol,left_id,blockDimension+1,cartesian_comm,&send_requests[1]);//send of the last col
+        MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&send_requests[2]);//send of the last line
+        MPI_Isend(&block[1][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&send_requests[3]);//send of the first line
+        MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,1,cartesian_comm,&send_requests[4]);//send of the up left
+        MPI_Isend(&block[1][blockDimension],1,MPI_CHAR,up_right,1,cartesian_comm,&send_requests[5]);//send of the up right
+        MPI_Isend(&block[blockDimension][blockDimension],1,MPI_CHAR,down_right_id,1,cartesian_comm,&send_requests[6]);//send of the down right
+        MPI_Isend(&block[blockDimension][1],1,MPI_CHAR,down_left_id,1,cartesian_comm,&send_requests[7]);//send of the down left
 
-    // sleep(2);
+        // sleep(2);
 
-    MPI_Recv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//receive of first column
-    MPI_Recv(&block[1][blockDimension+1],1,oneCol,right_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last column
-    MPI_Recv(&block[0][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the firt line
-    MPI_Recv(&block[blockDimension+1][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last line
-    MPI_Recv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,1,cartesian_comm,MPI_STATUS_IGNORE);//receive of the down right
-    MPI_Recv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the down left
-    MPI_Recv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the up right
-    MPI_Recv(&block[0][0],1,MPI_CHAR,up_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve fo the up left
+        MPI_Recv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//receive of first column
+        MPI_Recv(&block[1][blockDimension+1],1,oneCol,right_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last column
+        MPI_Recv(&block[0][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the firt line
+        MPI_Recv(&block[blockDimension+1][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last line
+        MPI_Recv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,1,cartesian_comm,MPI_STATUS_IGNORE);//receive of the down right
+        MPI_Recv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the down left
+        MPI_Recv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the up right
+        MPI_Recv(&block[0][0],1,MPI_CHAR,up_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve fo the up left
 
-    if(my_rank==0){
-        printf("\n\n");
-        print_board(block,blockDimension+2,stdout);
-        fflush(stdout);
-    }
-
-    //calculate the inside
-    int neighbors=0;
-    // printf("My first update\n");
-    for(i=2;i<blockDimension;i++){
-        for(j=2;j<blockDimension;j++){
-            neighbors=0;
-            if(block[i-1][j-1]==ALIVE)neighbors++;
-            if(block[i-1][j]==ALIVE)neighbors++;
-            if(block[i-1][j+1]==ALIVE)neighbors++;
-            if(block[i][j-1]==ALIVE)neighbors++;
-            if(block[i][j+1]==ALIVE)neighbors++;
-            if(block[i+1][j-1]==ALIVE)neighbors++;
-            if(block[i+1][j]==ALIVE)neighbors++;
-            if(block[i+1][j+1]==ALIVE)neighbors++;
-            if(block[i][j]==ALIVE){
-                if(neighbors<=1){
-                    newblock[i][j]=DEAD;
-                }else if(neighbors==2 || neighbors==3){
-                    newblock[i][j]=ALIVE;
-                }else if(neighbors>3){
-                    newblock[i][j]=DEAD;
-                }
-            }else{
-                if(neighbors==3){
-                    newblock[i][j]=ALIVE;
-                }else{
-                    newblock[i][j]=DEAD;
-                }
-            }
+        if(my_rank==0){
+            printf("\n\n");
+            print_board(block,blockDimension+2,stdout);
+            fflush(stdout);
         }
-    }
 
-    //updates the outer part
-    //the i takes just two values: 1 , blockDimension
-    //the j takes all the values from [1,blockDimension]
-    for(i=1;i<blockDimension+1;i+=blockDimension-1){
-
-        //update the first and last row
-        for(j=1;j<blockDimension+1;j++){
-            neighbors=0;
-            if(block[i-1][j-1]==ALIVE)neighbors++;
-            if(block[i-1][j]==ALIVE)neighbors++;
-            if(block[i-1][j+1]==ALIVE)neighbors++;
-            if(block[i][j-1]==ALIVE)neighbors++;
-            if(block[i][j+1]==ALIVE)neighbors++;
-            if(block[i+1][j-1]==ALIVE)neighbors++;
-            if(block[i+1][j]==ALIVE)neighbors++;
-            if(block[i+1][j+1]==ALIVE)neighbors++;
-
-            if(block[i][j]==ALIVE){
-                if(neighbors<=1){
-                    newblock[i][j]=DEAD;
-                }else if(neighbors==2 || neighbors==3){
-                    newblock[i][j]=ALIVE;
-                }else if(neighbors>3){
-                    newblock[i][j]=DEAD;
-                }
-            }else{
-                if(neighbors==3){
-                    newblock[i][j]=ALIVE;
+        //calculate the inside
+        int neighbors=0;
+        // printf("My first update\n");
+        for(i=2;i<blockDimension;i++){
+            for(j=2;j<blockDimension;j++){
+                neighbors=0;
+                if(block[i-1][j-1]==ALIVE)neighbors++;
+                if(block[i-1][j]==ALIVE)neighbors++;
+                if(block[i-1][j+1]==ALIVE)neighbors++;
+                if(block[i][j-1]==ALIVE)neighbors++;
+                if(block[i][j+1]==ALIVE)neighbors++;
+                if(block[i+1][j-1]==ALIVE)neighbors++;
+                if(block[i+1][j]==ALIVE)neighbors++;
+                if(block[i+1][j+1]==ALIVE)neighbors++;
+                if(block[i][j]==ALIVE){
+                    if(neighbors<=1){
+                        changed++;
+                        newblock[i][j]=DEAD;
+                    }else if(neighbors==2 || neighbors==3){
+                        newblock[i][j]=ALIVE;
+                    }else if(neighbors>3){
+                        changed++;
+                        newblock[i][j]=DEAD;
+                    }
                 }else{
-                    newblock[i][j]=DEAD;
+                    if(neighbors==3){
+                        changed++;
+                        newblock[i][j]=ALIVE;
+                    }else{
+                        newblock[i][j]=DEAD;
+                    }
                 }
             }
         }
 
-        //now we do the same, but instead of having the i fixed we have the j add we use [j][i]
-        //this updates the first and last column
-        //you don't actual need a second loop, you can just add it to the up loop
-        //(check the corerners twice, not a problem)
-        for(j=1;j<blockDimension+1;j++){
-            neighbors=0;
-            if(block[j-1][i-1]==ALIVE)neighbors++;
-            if(block[j-1][i]==ALIVE)neighbors++;
-            if(block[j-1][i+1]==ALIVE)neighbors++;
-            if(block[j][i-1]==ALIVE)neighbors++;
-            if(block[j][i+1]==ALIVE)neighbors++;
-            if(block[j+1][i-1]==ALIVE)neighbors++;
-            if(block[j+1][i]==ALIVE)neighbors++;
-            if(block[j+1][i+1]==ALIVE)neighbors++;
+        //updates the outer part
+        //the i takes just two values: 1 , blockDimension
+        //the j takes all the values from [1,blockDimension]
+        for(i=1;i<blockDimension+1;i+=blockDimension-1){
 
-            if(block[j][i]==ALIVE){
-                if(neighbors<=1){
-                    newblock[j][i]=DEAD;
-                }else if(neighbors==2 || neighbors==3){
-                    newblock[j][i]=ALIVE;
-                }else if(neighbors>3){
-                    newblock[j][i]=DEAD;
-                }
-            }else{
-                if(neighbors==3){
-                    newblock[j][i]=ALIVE;
+            //update the first and last row
+            for(j=1;j<blockDimension+1;j++){
+                neighbors=0;
+                if(block[i-1][j-1]==ALIVE)neighbors++;
+                if(block[i-1][j]==ALIVE)neighbors++;
+                if(block[i-1][j+1]==ALIVE)neighbors++;
+                if(block[i][j-1]==ALIVE)neighbors++;
+                if(block[i][j+1]==ALIVE)neighbors++;
+                if(block[i+1][j-1]==ALIVE)neighbors++;
+                if(block[i+1][j]==ALIVE)neighbors++;
+                if(block[i+1][j+1]==ALIVE)neighbors++;
+
+                if(block[i][j]==ALIVE){
+                    if(neighbors<=1){
+                        changed++;
+                        newblock[i][j]=DEAD;
+                    }else if(neighbors==2 || neighbors==3){
+                        newblock[i][j]=ALIVE;
+                    }else if(neighbors>3){
+                        changed++;
+                        newblock[i][j]=DEAD;
+                    }
                 }else{
-                    newblock[j][i]=DEAD;
+                    if(neighbors==3){
+                        changed++;
+                        newblock[i][j]=ALIVE;
+                    }else{
+                        newblock[i][j]=DEAD;
+                    }
+                }
+            }
+
+            //now we do the same, but instead of having the i fixed we have the j add we use [j][i]
+            //this updates the first and last column
+            //you don't actual need a second loop, you can just add it to the up loop
+            //(check the corerners twice, not a problem)
+            for(j=1;j<blockDimension+1;j++){
+                neighbors=0;
+                if(block[j-1][i-1]==ALIVE)neighbors++;
+                if(block[j-1][i]==ALIVE)neighbors++;
+                if(block[j-1][i+1]==ALIVE)neighbors++;
+                if(block[j][i-1]==ALIVE)neighbors++;
+                if(block[j][i+1]==ALIVE)neighbors++;
+                if(block[j+1][i-1]==ALIVE)neighbors++;
+                if(block[j+1][i]==ALIVE)neighbors++;
+                if(block[j+1][i+1]==ALIVE)neighbors++;
+
+                if(block[j][i]==ALIVE){
+                    if(neighbors<=1){
+                        changed++;
+                        newblock[j][i]=DEAD;
+                    }else if(neighbors==2 || neighbors==3){
+                        newblock[j][i]=ALIVE;
+                    }else if(neighbors>3){
+                        changed++;
+                        newblock[j][i]=DEAD;
+                    }
+                }else{
+                    if(neighbors==3){
+                        newblock[j][i]=ALIVE;
+                    }else{
+                        changed++;
+                        newblock[j][i]=DEAD;
+                    }
                 }
             }
         }
 
-    }
+        if(my_rank==0){
+            printf("\n\nThe New Block of 0\n\n");
+            print_board(newblock,blockDimension+2,stdout);
+            printf("\n\n");
+        }
+        printf("(%2d)%2d : %3d\n",cur_loop, my_rank,changed);
 
-    if(my_rank==0){
-        printf("\n\nThe New Block of 0\n\n");
-        print_board(newblock,blockDimension+2,stdout);
-        printf("\n\n");
+        //swap the newblock with the block variable
+        char ** temp;
+        temp=newblock;
+        newblock=block;
+        block=temp;
     }
 
 
