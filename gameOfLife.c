@@ -6,6 +6,7 @@
 
 #define ALIVE 'X'
 #define DEAD 'O'
+#define EMPTY '*'
 #define DEBUG 1
 
 void print_board(char** board,int size,FILE* stream){
@@ -164,16 +165,16 @@ int main(int argc, char  *argv[]) {
     //initialize the board's with 'q'
     for(i=0;i<blockDimension+2;i++){
         for(j=0;j<blockDimension+2;j++){
-            block[i][j]='q';
-            newblock[i][j]='q';
-            empty_block[i][j]='q';
+            block[i][j]=EMPTY;
+            newblock[i][j]=EMPTY;
+            empty_block[i][j]=EMPTY;
         }
     }
 
     for(i=1;i<blockDimension+1;i++){
         for(j=1;j<blockDimension+1;j++){
             random_number = rand()%10;
-            empty_block[i][j]='q';
+            empty_block[i][j]=EMPTY;
             if(random_number==0){
                 block[i][j]=ALIVE;
             }else{
@@ -192,24 +193,24 @@ int main(int argc, char  *argv[]) {
     MPI_Barrier( MPI_COMM_WORLD);
     MPI_Request send_requests[8];
     MPI_Isend(&block[1][1], 1, oneCol , right_id , blockDimension+1 , cartesian_comm,&send_requests[0] );//send of the first col
-    MPI_Isend(&block[1][blockDimension],1,oneCol,left_id,blockDimension+1,cartesian_comm,&send_requests[1]);
-    MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&send_requests[2]);
-    MPI_Isend(&block[1][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&send_requests[3]);
-    MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,1,cartesian_comm,&send_requests[4]);
-    MPI_Isend(&block[1][blockDimension],1,MPI_CHAR,up_right,1,cartesian_comm,&send_requests[5]);
-    MPI_Isend(&block[blockDimension][blockDimension],1,MPI_CHAR,down_right_id,1,cartesian_comm,&send_requests[6]);
-    MPI_Isend(&block[blockDimension][1],1,MPI_CHAR,down_left_id,1,cartesian_comm,&send_requests[7]);
+    MPI_Isend(&block[1][blockDimension],1,oneCol,left_id,blockDimension+1,cartesian_comm,&send_requests[1]);//send of the last col
+    MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&send_requests[2]);//send of the last line
+    MPI_Isend(&block[1][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&send_requests[3]);//send of the first line
+    MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,1,cartesian_comm,&send_requests[4]);//send of the up left
+    MPI_Isend(&block[1][blockDimension],1,MPI_CHAR,up_right,1,cartesian_comm,&send_requests[5]);//send of the up right
+    MPI_Isend(&block[blockDimension][blockDimension],1,MPI_CHAR,down_right_id,1,cartesian_comm,&send_requests[6]);//send of the down right
+    MPI_Isend(&block[blockDimension][1],1,MPI_CHAR,down_left_id,1,cartesian_comm,&send_requests[7]);//send of the down left
 
-    sleep(2);
+    // sleep(2);
 
-    MPI_Recv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
-    MPI_Recv(&block[1][blockDimension+1],1,oneCol,right_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
-    MPI_Recv(&block[0][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
-    MPI_Recv(&block[blockDimension+1][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);
-    MPI_Recv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,1,cartesian_comm,MPI_STATUS_IGNORE);
-    MPI_Recv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);
-    MPI_Recv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,1,cartesian_comm,MPI_STATUS_IGNORE);
-    MPI_Recv(&block[0][0],1,MPI_CHAR,up_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);
+    MPI_Recv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//receive of first column
+    MPI_Recv(&block[1][blockDimension+1],1,oneCol,right_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last column
+    MPI_Recv(&block[0][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the firt line
+    MPI_Recv(&block[blockDimension+1][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last line
+    MPI_Recv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,1,cartesian_comm,MPI_STATUS_IGNORE);//receive of the down right
+    MPI_Recv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the down left
+    MPI_Recv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the up right
+    MPI_Recv(&block[0][0],1,MPI_CHAR,up_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve fo the up left
 
     if(my_rank==0){
         printf("\n\n");
@@ -249,36 +250,76 @@ int main(int argc, char  *argv[]) {
         }
     }
 
-    for(i=1;i<blockDimension+1;i++){
-        neighbors=0;
-        if(block[0][i-1]==ALIVE)neighbors++;
-        if(block[0][i]==ALIVE)neighbors++;
-        if(block[0][i+1]==ALIVE)neighbors++;
-        if(block[1][i-1]==ALIVE)neighbors++;
-        if(block[1][i+1]==ALIVE)neighbors++;
-        if(block[2][i-1]==ALIVE)neighbors++;
-        if(block[2][i]==ALIVE)neighbors++;
-        if(block[2][i+1]==ALIVE)neighbors++;
+    //updates the outer part
+    //the i takes just two values: 1 , blockDimension
+    //the j takes all the values from [1,blockDimension]
+    for(i=1;i<blockDimension+1;i+=blockDimension-1){
 
-        if(block[1][j]==ALIVE){
-            if(neighbors<=1){
-                newblock[1][i]=DEAD;
-            }else if(neighbors==2 || neighbors==3){
-                newblock[1][i]=ALIVE;
-            }else if(neighbors>3){
-                newblock[1][i]=DEAD;
-            }
-        }else{
-            if(neighbors==3){
-                newblock[1][i]=ALIVE;
+        //update the first and last row
+        for(j=1;j<blockDimension+1;j++){
+            neighbors=0;
+            if(block[i-1][j-1]==ALIVE)neighbors++;
+            if(block[i-1][j]==ALIVE)neighbors++;
+            if(block[i-1][j+1]==ALIVE)neighbors++;
+            if(block[i][j-1]==ALIVE)neighbors++;
+            if(block[i][j+1]==ALIVE)neighbors++;
+            if(block[i+1][j-1]==ALIVE)neighbors++;
+            if(block[i+1][j]==ALIVE)neighbors++;
+            if(block[i+1][j+1]==ALIVE)neighbors++;
+
+            if(block[i][j]==ALIVE){
+                if(neighbors<=1){
+                    newblock[i][j]=DEAD;
+                }else if(neighbors==2 || neighbors==3){
+                    newblock[i][j]=ALIVE;
+                }else if(neighbors>3){
+                    newblock[i][j]=DEAD;
+                }
             }else{
-                newblock[1][i]=DEAD;
+                if(neighbors==3){
+                    newblock[i][j]=ALIVE;
+                }else{
+                    newblock[i][j]=DEAD;
+                }
             }
         }
+
+        //now we do the same, but instead of having the i fixed we have the j add we use [j][i]
+        //this updates the first and last column
+        //you don't actual need a second loop, you can just add it to the up loop
+        //(check the corerners twice, not a problem)
+        for(j=1;j<blockDimension+1;j++){
+            neighbors=0;
+            if(block[j-1][i-1]==ALIVE)neighbors++;
+            if(block[j-1][i]==ALIVE)neighbors++;
+            if(block[j-1][i+1]==ALIVE)neighbors++;
+            if(block[j][i-1]==ALIVE)neighbors++;
+            if(block[j][i+1]==ALIVE)neighbors++;
+            if(block[j+1][i-1]==ALIVE)neighbors++;
+            if(block[j+1][i]==ALIVE)neighbors++;
+            if(block[j+1][i+1]==ALIVE)neighbors++;
+
+            if(block[j][i]==ALIVE){
+                if(neighbors<=1){
+                    newblock[j][i]=DEAD;
+                }else if(neighbors==2 || neighbors==3){
+                    newblock[j][i]=ALIVE;
+                }else if(neighbors>3){
+                    newblock[j][i]=DEAD;
+                }
+            }else{
+                if(neighbors==3){
+                    newblock[j][i]=ALIVE;
+                }else{
+                    newblock[j][i]=DEAD;
+                }
+            }
+        }
+
     }
 
     if(my_rank==0){
-        printf("\n\n");
+        printf("\n\nThe New Block of 0\n\n");
         print_board(newblock,blockDimension+2,stdout);
         printf("\n\n");
     }
