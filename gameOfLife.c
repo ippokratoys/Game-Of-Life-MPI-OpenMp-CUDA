@@ -5,10 +5,12 @@
 #include <time.h>
 
 #define ALIVE 'X'
-#define DEAD 'O'
-#define EMPTY '*'
+#define DEAD '.'
+#define EMPTY '?'
 #define DEBUG 1
-#define TOTAL_LOOPS 1
+//how many loops will hapen
+#define TOTAL_LOOPS 1000
+//every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0
 
 void print_board(char** board,int size,FILE* stream){
@@ -35,15 +37,18 @@ void print_board_inside(char** board,int size,FILE* stream){
 
 int main(int argc, char  *argv[]) {
     int i,j;
-    int my_coord[2];// my i,j in the cartesian topologie
-    int coord[2];
-    int return_val;
+    int my_coord[2];// process i,j in the cartesian topologie
+    int coord[2];//buffer coordinates for finding neighbors
+    int return_val;//buffer
 
-    int number_of_process,dimensions,my_rank,blocks_per_line;
-    int blockDimension;
+    int number_of_process,//number of process
+        dimensions,//dimensions of the (full)grid, read by the file
+        my_rank,//my rank in the cartesian  topologie
+        blocks_per_line;//how many blocks we have in each line/row
+    int blockDimension;//the dimension of each process block
     double tempblocks_per_line;
 
-    FILE *fp;
+    FILE *fp;//the file from wich we will do the reading
 
     // 8 variables for the ids of each neighbor
     int up_left_id,up_id,up_right;
@@ -54,11 +59,13 @@ int main(int argc, char  *argv[]) {
     if(fp==NULL){
         perror("Fail to open the file");
     }
+    //read the grid from the file
     fscanf(fp, "%d",&dimensions);
 
 
     MPI_Init(&argc,&argv);
     MPI_Comm_size(MPI_COMM_WORLD, &number_of_process);
+    //do the basic calculation for the size of the grid
     tempblocks_per_line=sqrt(number_of_process);
     blocks_per_line=(int) tempblocks_per_line;
     blockDimension=dimensions/blocks_per_line;
@@ -142,7 +149,7 @@ int main(int argc, char  *argv[]) {
     }
 #endif
 
-    MPI_Barrier( MPI_COMM_WORLD);
+    MPI_Barrier( MPI_COMM_WORLD);//wait for all process to reach here
 
 
     //initialize the block
@@ -172,33 +179,72 @@ int main(int argc, char  *argv[]) {
             empty_block[i][j]=EMPTY;
         }
     }
+//random initialazation of the grid in each process
+    // for(i=1;i<blockDimension+1;i++){
+    //     for(j=1;j<blockDimension+1;j++){
+    //         random_number = rand()%10;
+    //         empty_block[i][j]=EMPTY;
+    //         if(random_number==0){
+    //             block[i][j]=ALIVE;
+    //         }else{
+    //             block[i][j]=DEAD;
+    //         }
+    //     }
+    // }
+//initialazation form the file
+////////////////do the reading////////////////
+    int bufc;
+    int cycle_size=dimensions/blockDimension;// CAREFULLL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //how much i must move in the file for one line
+    int file_line_offset=dimensions+1;//because of the \n
+    int first_line=(my_rank/cycle_size)*(blockDimension);
+	int first_col=(my_rank%cycle_size)*(blockDimension);
+    int correct_offset=file_line_offset-blockDimension;
 
-    for(i=1;i<blockDimension+1;i++){
-        for(j=1;j<blockDimension+1;j++){
-            random_number = rand()%10;
-            empty_block[i][j]=EMPTY;
-            if(random_number==0){
-                block[i][j]=ALIVE;
-            }else{
-                block[i][j]=DEAD;
-            }
-        }
-    }
+	int seek;
+	seek=1+file_line_offset*first_line;//move to the correct line
+	seek+=first_col;//move to the correct column
+	fseek(fp,seek,SEEK_CUR);
+	for(i=first_line;i<first_line+blockDimension;i++){
+		//offset move in the file correct line and row
+		for(j=0;j<blockDimension;j++){
+			bufc=fgetc(fp);
+//			if(j==0)printf("rank:%d char:|%c|\n",my_rank,bufc);
+//			if(bufc!=ALIVE && bufc!=DEAD )printf("error reading|%c|\n",bufc);
+			if(bufc!=DEAD && bufc!=ALIVE){
+				printf("LOOOL rank:%d-i=%d,j=%d,it's |%c|\n",my_rank,i,j,bufc);
+			}
+			block[i-first_line+1][j+1]=bufc;
+		}//be carefull of the \n
+		fseek(fp,correct_offset,SEEK_CUR);//go to the next line
+	}
+	printf("!%d end with reading\n",my_rank);
+    fflush(stdout);
+    // MPI_Barrier( MPI_COMM_WORLD);
+	fclose(fp);//close the file of input
+////////////////end of reading////////////////
 
-    if(my_rank==0){
-        print_board(block,blockDimension+2,stdout);
-        fflush(stdout);
-    }
+
+
+    // sleep(1);
+    // if(my_rank==number_of_process-1){
+    //     print_board(block,blockDimension+2,stdout);
+    //     fflush(stdout);
+    // }
+    // MPI_Barrier( MPI_COMM_WORLD);
+    // exit(11);
 
 
     int cur_loop = 0;
     int changed = 0;//a variable to know if somthing has change
     MPI_Barrier( MPI_COMM_WORLD);
+    int total_changes;//total changes in one loop
     for (cur_loop = 0; cur_loop < TOTAL_LOOPS; cur_loop++) {
+        total_changes=0;
         changed=0;//nothing has change
         MPI_Request send_requests[8];
-        MPI_Isend(&block[1][1], 1, oneCol , right_id , blockDimension+1 , cartesian_comm,&send_requests[0] );//send of the first col
-        MPI_Isend(&block[1][blockDimension],1,oneCol,left_id,blockDimension+1,cartesian_comm,&send_requests[1]);//send of the last col
+        MPI_Isend(&block[1][1], 1, oneCol , left_id , blockDimension+1 , cartesian_comm,&send_requests[0] );//send of the first col
+        MPI_Isend(&block[1][blockDimension],1,oneCol,right_id,blockDimension+1,cartesian_comm,&send_requests[1]);//send of the last col
         MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&send_requests[2]);//send of the last line
         MPI_Isend(&block[1][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&send_requests[3]);//send of the first line
         MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,1,cartesian_comm,&send_requests[4]);//send of the up left
@@ -322,9 +368,9 @@ int main(int argc, char  *argv[]) {
                     }
                 }else{
                     if(neighbors==3){
+                        changed++;
                         newblock[j][i]=ALIVE;
                     }else{
-                        changed++;
                         newblock[j][i]=DEAD;
                     }
                 }
@@ -336,8 +382,26 @@ int main(int argc, char  *argv[]) {
             print_board(newblock,blockDimension+2,stdout);
             printf("\n\n");
         }
-        printf("(%2d)%2d : %3d\n",cur_loop, my_rank,changed);
+        if(my_rank!=0){
+            printf("(%2d)%2d : %3d\n",cur_loop, my_rank,changed);
+        }
 
+//no need to add this code if the check is 0
+#if CHECK_FOR_CHANGE>0
+        //if in this loop we have to check for change
+        if(cur_loop%CHECK_FOR_CHANGE==0){
+            MPI_Allreduce(&changed,&total_changes,1,MPI_INT,MPI_SUM,cartesian_comm);
+            if(my_rank==0){
+                printf("Total changes : %d\n",total_changes);
+                if(total_changes==0){
+                    printf("Nooothing chaned on loop %d/%d\n",cur_loop+1,TOTAL_LOOPS);
+                }
+            }
+            if(total_changes==0){
+                break;
+            }
+        }
+#endif
         //swap the newblock with the block variable
         char ** temp;
         temp=newblock;
@@ -350,7 +414,6 @@ int main(int argc, char  *argv[]) {
     //     free(block[i]);
     // }
     // free(block);
-    fclose(fp);
     MPI_Finalize();
     return 0;
 }
