@@ -237,6 +237,7 @@ int main(int argc, char  *argv[]) {
         total_changes=0;
         changed=0;//nothing has change
         MPI_Request send_requests[8];
+        MPI_Request recv_requests[8];
         MPI_Isend(&block[1][1], 1, oneCol , left_id , blockDimension+1 , cartesian_comm,&send_requests[0] );//send of the first col
         MPI_Isend(&block[1][blockDimension],1,oneCol,right_id,blockDimension+1,cartesian_comm,&send_requests[1]);//send of the last col
         MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&send_requests[2]);//send of the last line
@@ -248,14 +249,14 @@ int main(int argc, char  *argv[]) {
 
         // sleep(2);
 
-        MPI_Recv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//receive of first column
-        MPI_Recv(&block[1][blockDimension+1],1,oneCol,right_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last column
-        MPI_Recv(&block[0][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the firt line
-        MPI_Recv(&block[blockDimension+1][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last line
-        MPI_Recv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,1,cartesian_comm,MPI_STATUS_IGNORE);//receive of the down right
-        MPI_Recv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the down left
-        MPI_Recv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the up right
-        MPI_Recv(&block[0][0],1,MPI_CHAR,up_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve fo the up left
+        MPI_Irecv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,&recv_requests[0]);//receive of first column
+        MPI_Irecv(&block[1][blockDimension+1],1,oneCol,right_id,blockDimension+1,cartesian_comm,&recv_requests[1]);//recieve of the last column
+        MPI_Irecv(&block[0][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&recv_requests[2]);//recieve of the firt line
+        MPI_Irecv(&block[blockDimension+1][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&recv_requests[3]);//recieve of the last line
+        MPI_Irecv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,1,cartesian_comm,&recv_requests[4]);//receive of the down right
+        MPI_Irecv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,1,cartesian_comm,&recv_requests[5]);//recieve of the down left
+        MPI_Irecv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,1,cartesian_comm,&recv_requests[6]);//recieve of the up right
+        MPI_Irecv(&block[0][0],1,MPI_CHAR,up_left_id,1,cartesian_comm,&recv_requests[7]);//recieve fo the up left
 
         if(my_rank==0){
             printf("\n\n");
@@ -297,7 +298,8 @@ int main(int argc, char  *argv[]) {
                 }
             }
         }
-
+        MPI_Status stats[8];
+        MPI_Waitall(8, recv_requests,stats);
         //updates the outer part
         //the i takes just two values: 1 , blockDimension
         //the j takes all the values from [1,blockDimension]
