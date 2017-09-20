@@ -9,7 +9,7 @@
 #define EMPTY '?'
 #define DEBUG 1
 //how many loops will hapen
-#define TOTAL_LOOPS 1000
+#define TOTAL_LOOPS 1
 //every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0
 
@@ -402,12 +402,67 @@ int main(int argc, char  *argv[]) {
         newblock=block;
         block=temp;
     }
+//write the output to a file
+    //take the needed part of the board(not the ghost-edges)
+    char** final_board=malloc(sizeof(char*)*blockDimension);
+    int is_last = 0 ;
+    if( my_coord[1]+1==blocks_per_line ){
+        is_last=1;//if it's in the last line we need t oadd \n
+    }
+    final_board[0]=malloc(sizeof(char)*(blockDimension*blockDimension +is_last*blockDimension));
+    //do the malloc
+    if(is_last==1){
+        //if it's the last one
+        for (i = 0; i < blockDimension; i++) {
+            final_board[i]=&final_board[0][i*(blockDimension+1)];
+            final_board[i][blockDimension]='\n';//and add as last elemt the new line
+        }
+    }else{
+        for (i = 0; i < blockDimension; i++) {
+            final_board[i]=&final_board[0][i*blockDimension];
+        }
+    }
 
+    //copy the board
+    for (i = 0; i < blockDimension; i++) {
+        for (j = 0; j < blockDimension; j++) {
+            final_board[i][j]=block[i+1][j+1];
+        }
+    }
+    MPI_Datatype my_sub_array;//the datatype we are going to create
+    int starts[2];//where this arays starts from
+    int sub_size[2]  = {blockDimension, blockDimension};
+    int big_size[2]  = {dimensions, dimensions+1};//it's plus one the new line
+    starts[0]=my_coord[0]*blockDimension;
+    starts[1]=my_coord[1]*blockDimension;
+    if(is_last==1){
+        sub_size[1]++;//the sub size is 1 bigger
+    }
+    MPI_Barrier(cartesian_comm);
+    MPI_Type_create_subarray(2, big_size, sub_size, starts,MPI_ORDER_C, MPI_CHAR, &my_sub_array);
+    MPI_Type_commit (&my_sub_array);
+    MPI_File   file;//the file that we will use for output
+    MPI_Status file_status;
+    MPI_Status write_status;
+    MPI_File_open(cartesian_comm, "out.txt",MPI_MODE_CREATE|MPI_MODE_WRONLY,MPI_INFO_NULL, &file);
+    if(my_rank==0){
+        char buf[1000];
+        sprintf(buf, "%010d\n",dimensions);
+        MPI_File_write(file, buf, 11,MPI_CHAR, &file_status);
+    }
+    MPI_File_set_view(file, 11,  MPI_CHAR, my_sub_array,"native", MPI_INFO_NULL);
 
+    if(is_last==1){
+        MPI_File_write_all(file, final_board[0],blockDimension*blockDimension+blockDimension, MPI_CHAR, &write_status);
+    }else{
+        MPI_File_write_all(file, final_board[0],blockDimension*blockDimension , MPI_CHAR, &write_status);
+    }
+    MPI_File_close(&file);
+// end of file output
     // for(i=0;i<blockDimension;i++){
     //     free(block[i]);
-    // }
     // free(block);
+    // }
     MPI_Finalize();
     return 0;
 }
