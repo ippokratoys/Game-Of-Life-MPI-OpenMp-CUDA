@@ -13,6 +13,16 @@
 //every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0
 
+#define UP_LEFT 0
+#define UP 1
+#define UP_RIGHT 2
+#define RIGHT 3
+#define DOWN_RIGHT 4
+#define DOWN 5
+#define DOWN_LEFT 6
+#define LEFT 7
+
+
 void print_board(char** board,int size,FILE* stream){
     int i,j;
     for ( i = 0; i < size; i++) {
@@ -237,25 +247,25 @@ int main(int argc, char  *argv[]) {
         total_changes=0;
         changed=0;//nothing has change
         MPI_Request send_requests[8];
-        MPI_Isend(&block[1][1], 1, oneCol , left_id , blockDimension+1 , cartesian_comm,&send_requests[0] );//send of the first col
-        MPI_Isend(&block[1][blockDimension],1,oneCol,right_id,blockDimension+1,cartesian_comm,&send_requests[1]);//send of the last col
-        MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&send_requests[2]);//send of the last line
-        MPI_Isend(&block[1][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&send_requests[3]);//send of the first line
-        MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,1,cartesian_comm,&send_requests[4]);//send of the up left
-        MPI_Isend(&block[1][blockDimension],1,MPI_CHAR,up_right,1,cartesian_comm,&send_requests[5]);//send of the up right
-        MPI_Isend(&block[blockDimension][blockDimension],1,MPI_CHAR,down_right_id,1,cartesian_comm,&send_requests[6]);//send of the down right
-        MPI_Isend(&block[blockDimension][1],1,MPI_CHAR,down_left_id,1,cartesian_comm,&send_requests[7]);//send of the down left
+        MPI_Isend(&block[1][1], 1, oneCol , left_id , RIGHT , cartesian_comm,&send_requests[0] );//send of the first col
+        MPI_Isend(&block[1][blockDimension],1,oneCol,right_id,LEFT,cartesian_comm,&send_requests[1]);//send of the last col
+        MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,UP,cartesian_comm,&send_requests[2]);//send of the last line
+        MPI_Isend(&block[1][1],1,oneRow,up_id,DOWN,cartesian_comm,&send_requests[3]);//send of the first line
+        MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,DOWN_RIGHT,cartesian_comm,&send_requests[4]);//send of the up left
+        MPI_Isend(&block[1][blockDimension],1,MPI_CHAR,up_right,DOWN_LEFT,cartesian_comm,&send_requests[5]);//send of the up right
+        MPI_Isend(&block[blockDimension][blockDimension],1,MPI_CHAR,down_right_id,UP_LEFT,cartesian_comm,&send_requests[6]);//send of the down right
+        MPI_Isend(&block[blockDimension][1],1,MPI_CHAR,down_left_id,UP_RIGHT,cartesian_comm,&send_requests[7]);//send of the down left
 
         // sleep(2);
 
-        MPI_Recv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//receive of first column
-        MPI_Recv(&block[1][blockDimension+1],1,oneCol,right_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last column
-        MPI_Recv(&block[0][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the firt line
-        MPI_Recv(&block[blockDimension+1][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last line
-        MPI_Recv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,1,cartesian_comm,MPI_STATUS_IGNORE);//receive of the down right
-        MPI_Recv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the down left
-        MPI_Recv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the up right
-        MPI_Recv(&block[0][0],1,MPI_CHAR,up_left_id,1,cartesian_comm,MPI_STATUS_IGNORE);//recieve fo the up left
+        MPI_Recv(&block[1][0],1,oneCol,left_id,LEFT,cartesian_comm,MPI_STATUS_IGNORE);//receive of first column
+        MPI_Recv(&block[1][blockDimension+1],1,oneCol,right_id,RIGHT,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last column
+        MPI_Recv(&block[0][1],1,oneRow,up_id,UP,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the firt line
+        MPI_Recv(&block[blockDimension+1][1],1,oneRow,down_id,DOWN,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the last line
+        MPI_Recv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,DOWN_RIGHT,cartesian_comm,MPI_STATUS_IGNORE);//receive of the down right
+        MPI_Recv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,DOWN_LEFT,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the down left
+        MPI_Recv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,UP_RIGHT,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the up right
+        MPI_Recv(&block[0][0],1,MPI_CHAR,up_left_id,UP_LEFT,cartesian_comm,MPI_STATUS_IGNORE);//recieve fo the up left
 
         if(my_rank==0){
             printf("\n\n");
