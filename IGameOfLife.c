@@ -9,9 +9,18 @@
 #define EMPTY '?'
 #define DEBUG 1
 //how many loops will hapen
-#define TOTAL_LOOPS 1000
+#define TOTAL_LOOPS 100
 //every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0
+
+#define UP_LEFT 0
+#define UP 1
+#define UP_RIGHT 2
+#define RIGHT 3
+#define DOWN_RIGHT 4
+#define DOWN 5
+#define DOWN_LEFT 6
+#define LEFT 7
 
 void print_board(char** board,int size,FILE* stream){
     int i,j;
@@ -238,25 +247,25 @@ int main(int argc, char  *argv[]) {
         changed=0;//nothing has change
         MPI_Request send_requests[8];
         MPI_Request recv_requests[8];
-        MPI_Isend(&block[1][1], 1, oneCol , left_id , blockDimension+1 , cartesian_comm,&send_requests[0] );//send of the first col
-        MPI_Isend(&block[1][blockDimension],1,oneCol,right_id,blockDimension+1,cartesian_comm,&send_requests[1]);//send of the last col
-        MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&send_requests[2]);//send of the last line
-        MPI_Isend(&block[1][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&send_requests[3]);//send of the first line
-        MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,1,cartesian_comm,&send_requests[4]);//send of the up left
-        MPI_Isend(&block[1][blockDimension],1,MPI_CHAR,up_right,1,cartesian_comm,&send_requests[5]);//send of the up right
-        MPI_Isend(&block[blockDimension][blockDimension],1,MPI_CHAR,down_right_id,1,cartesian_comm,&send_requests[6]);//send of the down right
-        MPI_Isend(&block[blockDimension][1],1,MPI_CHAR,down_left_id,1,cartesian_comm,&send_requests[7]);//send of the down left
+        MPI_Isend(&block[1][1], 1, oneCol , left_id , RIGHT , cartesian_comm,&send_requests[0] );//send of the first col
+        MPI_Isend(&block[1][blockDimension],1,oneCol,right_id,LEFT,cartesian_comm,&send_requests[1]);//send of the last col
+        MPI_Isend(&block[blockDimension][1],1,oneRow,down_id,UP,cartesian_comm,&send_requests[2]);//send of the last line
+        MPI_Isend(&block[1][1],1,oneRow,up_id,DOWN,cartesian_comm,&send_requests[3]);//send of the first line
+        MPI_Isend(&block[1][1],1,MPI_CHAR,up_left_id,DOWN_RIGHT,cartesian_comm,&send_requests[4]);//send of the up left
+        MPI_Isend(&block[1][blockDimension],1,MPI_CHAR,up_right,DOWN_LEFT,cartesian_comm,&send_requests[5]);//send of the up right
+        MPI_Isend(&block[blockDimension][blockDimension],1,MPI_CHAR,down_right_id,UP_LEFT,cartesian_comm,&send_requests[6]);//send of the down right
+        MPI_Isend(&block[blockDimension][1],1,MPI_CHAR,down_left_id,UP_RIGHT,cartesian_comm,&send_requests[7]);//send of the down left
 
         // sleep(2);
 
-        MPI_Irecv(&block[1][0],1,oneCol,left_id,blockDimension+1,cartesian_comm,&recv_requests[0]);//receive of first column
-        MPI_Irecv(&block[1][blockDimension+1],1,oneCol,right_id,blockDimension+1,cartesian_comm,&recv_requests[1]);//recieve of the last column
-        MPI_Irecv(&block[0][1],1,oneRow,up_id,blockDimension+1,cartesian_comm,&recv_requests[2]);//recieve of the firt line
-        MPI_Irecv(&block[blockDimension+1][1],1,oneRow,down_id,blockDimension+1,cartesian_comm,&recv_requests[3]);//recieve of the last line
-        MPI_Irecv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,1,cartesian_comm,&recv_requests[4]);//receive of the down right
-        MPI_Irecv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,1,cartesian_comm,&recv_requests[5]);//recieve of the down left
-        MPI_Irecv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,1,cartesian_comm,&recv_requests[6]);//recieve of the up right
-        MPI_Irecv(&block[0][0],1,MPI_CHAR,up_left_id,1,cartesian_comm,&recv_requests[7]);//recieve fo the up left
+        MPI_Irecv(&block[1][0],1,oneCol,left_id,LEFT,cartesian_comm,&recv_requests[0]);//receive of first column
+        MPI_Irecv(&block[1][blockDimension+1],1,oneCol,right_id,RIGHT,cartesian_comm,&recv_requests[1]);//recieve of the last column
+        MPI_Irecv(&block[0][1],1,oneRow,up_id,UP,cartesian_comm,&recv_requests[2]);//recieve of the firt line
+        MPI_Irecv(&block[blockDimension+1][1],1,oneRow,down_id,DOWN,cartesian_comm,&recv_requests[3]);//recieve of the last line
+        MPI_Irecv(&block[blockDimension+1][blockDimension+1],1,MPI_CHAR,down_right_id,DOWN_RIGHT,cartesian_comm,&recv_requests[4]);//receive of the down right
+        MPI_Irecv(&block[blockDimension+1][0],1,MPI_CHAR,down_left_id,DOWN_LEFT,cartesian_comm,&recv_requests[5]);//recieve of the down left
+        MPI_Irecv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,UP_RIGHT,cartesian_comm,&recv_requests[6]);//recieve of the up right
+        MPI_Irecv(&block[0][0],1,MPI_CHAR,up_left_id,UP_LEFT,cartesian_comm,&recv_requests[7]);//recieve fo the up left
 
         if(my_rank==0){
             printf("\n\n");
@@ -404,7 +413,62 @@ int main(int argc, char  *argv[]) {
         newblock=block;
         block=temp;
     }
+    //write the output to a file
+        //take the needed part of the board(not the ghost-edges)
+        char** final_board=malloc(sizeof(char*)*blockDimension);
+        int is_last = 0 ;
+        if( my_coord[1]+1==blocks_per_line ){
+            is_last=1;//if it's in the last line we need t oadd \n
+        }
+        final_board[0]=malloc(sizeof(char)*(blockDimension*blockDimension +is_last*blockDimension));
+        //do the malloc
+        if(is_last==1){
+            //if it's the last one
+            for (i = 0; i < blockDimension; i++) {
+                final_board[i]=&final_board[0][i*(blockDimension+1)];
+                final_board[i][blockDimension]='\n';//and add as last elemt the new line
+            }
+        }else{
+            for (i = 0; i < blockDimension; i++) {
+                final_board[i]=&final_board[0][i*blockDimension];
+            }
+        }
 
+        //copy the board
+        for (i = 0; i < blockDimension; i++) {
+            for (j = 0; j < blockDimension; j++) {
+                final_board[i][j]=block[i+1][j+1];
+            }
+        }
+        MPI_Datatype my_sub_array;//the datatype we are going to create
+        int starts[2];//where this arays starts from
+        int sub_size[2]  = {blockDimension, blockDimension};
+        int big_size[2]  = {dimensions, dimensions+1};//it's plus one the new line
+        starts[0]=my_coord[0]*blockDimension;
+        starts[1]=my_coord[1]*blockDimension;
+        if(is_last==1){
+            sub_size[1]++;//the sub size is 1 bigger
+        }
+        MPI_Barrier(cartesian_comm);
+        MPI_Type_create_subarray(2, big_size, sub_size, starts,MPI_ORDER_C, MPI_CHAR, &my_sub_array);
+        MPI_Type_commit (&my_sub_array);
+        MPI_File   file;//the file that we will use for output
+        MPI_Status file_status;
+        MPI_Status write_status;
+        MPI_File_open(cartesian_comm, "out.txt",MPI_MODE_CREATE|MPI_MODE_WRONLY,MPI_INFO_NULL, &file);
+        if(my_rank==0){
+            char buf[1000];
+            sprintf(buf, "%010d\n",dimensions);
+            MPI_File_write(file, buf, 11,MPI_CHAR, &file_status);
+        }
+        MPI_File_set_view(file, 11,  MPI_CHAR, my_sub_array,"native", MPI_INFO_NULL);
+
+        if(is_last==1){
+            MPI_File_write_all(file, final_board[0],blockDimension*blockDimension+blockDimension, MPI_CHAR, &write_status);
+        }else{
+            MPI_File_write_all(file, final_board[0],blockDimension*blockDimension , MPI_CHAR, &write_status);
+        }
+        MPI_File_close(&file);
 
     // for(i=0;i<blockDimension;i++){
     //     free(block[i]);
