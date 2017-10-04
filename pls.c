@@ -4,12 +4,17 @@
 #include <stdlib.h>
 #include <time.h>
 
+#ifdef _OPENMP
+# include <omp.h>
+#endif
+
 #define ALIVE 'X'
 #define DEAD '.'
 #define EMPTY '?'
 #define DEBUG 1
 //how many loops will hapen
-#define TOTAL_LOOPS 100
+#define TOTAL_LOOPS 50
+
 //every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0
 
@@ -237,7 +242,6 @@ int main(int argc, char  *argv[]) {
     // MPI_Barrier( MPI_COMM_WORLD);
     // exit(11);
 
-
     int cur_loop = 0;
     int changed = 0;//a variable to know if somthing has change
     MPI_Barrier( MPI_COMM_WORLD);
@@ -275,111 +279,123 @@ int main(int argc, char  *argv[]) {
 
         //calculate the inside
         int neighbors=0;
-        // printf("My first update\n");
-        for(i=2;i<blockDimension;i++){
-            for(j=2;j<blockDimension;j++){
-                neighbors=0;
-                if(block[i-1][j-1]==ALIVE)neighbors++;
-                if(block[i-1][j]==ALIVE)neighbors++;
-                if(block[i-1][j+1]==ALIVE)neighbors++;
-                if(block[i][j-1]==ALIVE)neighbors++;
-                if(block[i][j+1]==ALIVE)neighbors++;
-                if(block[i+1][j-1]==ALIVE)neighbors++;
-                if(block[i+1][j]==ALIVE)neighbors++;
-                if(block[i+1][j+1]==ALIVE)neighbors++;
-                if(block[i][j]==ALIVE){
-                    if(neighbors<=1){
-                        changed++;
-                        newblock[i][j]=DEAD;
-                    }else if(neighbors==2 || neighbors==3){
-                        newblock[i][j]=ALIVE;
-                    }else if(neighbors>3){
-                        changed++;
-                        newblock[i][j]=DEAD;
-                    }
-                }else{
-                    if(neighbors==3){
-                        changed++;
-                        newblock[i][j]=ALIVE;
+        #pragma omp parallel private(neighbors) reduction(+:changed)
+        {
+            int schedule=blockDimension/omp_get_num_threads();
+            #pragma omp for schedule(static,schedule)
+            for(i=2;i<blockDimension;i++){
+
+                for(j=2;j<blockDimension;j++){
+                    neighbors=0;
+                    if(block[i-1][j-1]==ALIVE)neighbors++;
+                    if(block[i-1][j]==ALIVE)neighbors++;
+                    if(block[i-1][j+1]==ALIVE)neighbors++;
+                    if(block[i][j-1]==ALIVE)neighbors++;
+                    if(block[i][j+1]==ALIVE)neighbors++;
+                    if(block[i+1][j-1]==ALIVE)neighbors++;
+                    if(block[i+1][j]==ALIVE)neighbors++;
+                    if(block[i+1][j+1]==ALIVE)neighbors++;
+                    if(block[i][j]==ALIVE){
+                        if(neighbors<=1){
+                            changed++;
+                            newblock[i][j]=DEAD;
+                        }else if(neighbors==2 || neighbors==3){
+                            newblock[i][j]=ALIVE;
+                        }else if(neighbors>3){
+                            changed++;
+                            newblock[i][j]=DEAD;
+                        }
                     }else{
-                        newblock[i][j]=DEAD;
+                        if(neighbors==3){
+                            changed++;
+                            newblock[i][j]=ALIVE;
+                        }else{
+                            newblock[i][j]=DEAD;
+                        }
                     }
                 }
             }
         }
+        // printf("My first update\n");
+
         MPI_Status stats[8];
         MPI_Waitall(8, recv_requests,stats);
         //updates the outer part
         //the i takes just two values: 1 , blockDimension
         //the j takes all the values from [1,blockDimension]
-        for(i=1;i<blockDimension+1;i+=blockDimension-1){
+        #pragma omp parallel
+        {
+            int schedule=blockDimension/omp_get_num_threads();
+            #pragma omp for private(neighbors) reduction(+:changed) schedule(static,schedule)
+            for(i=1;i<blockDimension+1;i+=blockDimension-1){
+                //update the first and last row
+                for(j=1;j<blockDimension+1;j++){
+                    neighbors=0;
+                    if(block[i-1][j-1]==ALIVE)neighbors++;
+                    if(block[i-1][j]==ALIVE)neighbors++;
+                    if(block[i-1][j+1]==ALIVE)neighbors++;
+                    if(block[i][j-1]==ALIVE)neighbors++;
+                    if(block[i][j+1]==ALIVE)neighbors++;
+                    if(block[i+1][j-1]==ALIVE)neighbors++;
+                    if(block[i+1][j]==ALIVE)neighbors++;
+                    if(block[i+1][j+1]==ALIVE)neighbors++;
 
-            //update the first and last row
-            for(j=1;j<blockDimension+1;j++){
-                neighbors=0;
-                if(block[i-1][j-1]==ALIVE)neighbors++;
-                if(block[i-1][j]==ALIVE)neighbors++;
-                if(block[i-1][j+1]==ALIVE)neighbors++;
-                if(block[i][j-1]==ALIVE)neighbors++;
-                if(block[i][j+1]==ALIVE)neighbors++;
-                if(block[i+1][j-1]==ALIVE)neighbors++;
-                if(block[i+1][j]==ALIVE)neighbors++;
-                if(block[i+1][j+1]==ALIVE)neighbors++;
-
-                if(block[i][j]==ALIVE){
-                    if(neighbors<=1){
-                        changed++;
-                        newblock[i][j]=DEAD;
-                    }else if(neighbors==2 || neighbors==3){
-                        newblock[i][j]=ALIVE;
-                    }else if(neighbors>3){
-                        changed++;
-                        newblock[i][j]=DEAD;
-                    }
-                }else{
-                    if(neighbors==3){
-                        changed++;
-                        newblock[i][j]=ALIVE;
+                    if(block[i][j]==ALIVE){
+                        if(neighbors<=1){
+                            changed++;
+                            newblock[i][j]=DEAD;
+                        }else if(neighbors==2 || neighbors==3){
+                            newblock[i][j]=ALIVE;
+                        }else if(neighbors>3){
+                            changed++;
+                            newblock[i][j]=DEAD;
+                        }
                     }else{
-                        newblock[i][j]=DEAD;
+                        if(neighbors==3){
+                            changed++;
+                            newblock[i][j]=ALIVE;
+                        }else{
+                            newblock[i][j]=DEAD;
+                        }
+                    }
+                }
+
+                //now we do the same, but instead of having the i fixed we have the j add we use [j][i]
+                //this updates the first and last column
+                //you don't actual need a second loop, you can just add it to the up loop
+                //(check the corerners twice, not a problem)
+                for(j=1;j<blockDimension+1;j++){
+                    neighbors=0;
+                    if(block[j-1][i-1]==ALIVE)neighbors++;
+                    if(block[j-1][i]==ALIVE)neighbors++;
+                    if(block[j-1][i+1]==ALIVE)neighbors++;
+                    if(block[j][i-1]==ALIVE)neighbors++;
+                    if(block[j][i+1]==ALIVE)neighbors++;
+                    if(block[j+1][i-1]==ALIVE)neighbors++;
+                    if(block[j+1][i]==ALIVE)neighbors++;
+                    if(block[j+1][i+1]==ALIVE)neighbors++;
+
+                    if(block[j][i]==ALIVE){
+                        if(neighbors<=1){
+                            changed++;
+                            newblock[j][i]=DEAD;
+                        }else if(neighbors==2 || neighbors==3){
+                            newblock[j][i]=ALIVE;
+                        }else if(neighbors>3){
+                            changed++;
+                            newblock[j][i]=DEAD;
+                        }
+                    }else{
+                        if(neighbors==3){
+                            changed++;
+                            newblock[j][i]=ALIVE;
+                        }else{
+                            newblock[j][i]=DEAD;
+                        }
                     }
                 }
             }
 
-            //now we do the same, but instead of having the i fixed we have the j add we use [j][i]
-            //this updates the first and last column
-            //you don't actual need a second loop, you can just add it to the up loop
-            //(check the corerners twice, not a problem)
-            for(j=1;j<blockDimension+1;j++){
-                neighbors=0;
-                if(block[j-1][i-1]==ALIVE)neighbors++;
-                if(block[j-1][i]==ALIVE)neighbors++;
-                if(block[j-1][i+1]==ALIVE)neighbors++;
-                if(block[j][i-1]==ALIVE)neighbors++;
-                if(block[j][i+1]==ALIVE)neighbors++;
-                if(block[j+1][i-1]==ALIVE)neighbors++;
-                if(block[j+1][i]==ALIVE)neighbors++;
-                if(block[j+1][i+1]==ALIVE)neighbors++;
-
-                if(block[j][i]==ALIVE){
-                    if(neighbors<=1){
-                        changed++;
-                        newblock[j][i]=DEAD;
-                    }else if(neighbors==2 || neighbors==3){
-                        newblock[j][i]=ALIVE;
-                    }else if(neighbors>3){
-                        changed++;
-                        newblock[j][i]=DEAD;
-                    }
-                }else{
-                    if(neighbors==3){
-                        changed++;
-                        newblock[j][i]=ALIVE;
-                    }else{
-                        newblock[j][i]=DEAD;
-                    }
-                }
-            }
         }
 
         if(my_rank==0){
