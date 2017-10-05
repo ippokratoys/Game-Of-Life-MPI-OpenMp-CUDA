@@ -9,7 +9,7 @@
 #define EMPTY '?'
 #define DEBUG 1
 //how many loops will hapen
-#define TOTAL_LOOPS 100
+#define TOTAL_LOOPS 50
 //every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0
 

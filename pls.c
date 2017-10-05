@@ -279,7 +279,7 @@ int main(int argc, char  *argv[]) {
 
         //calculate the inside
         int neighbors=0;
-        #pragma omp parallel private(neighbors) reduction(+:changed)
+        #pragma omp parallel private(neighbors,j) reduction(+:changed)
         {
             int schedule=blockDimension/omp_get_num_threads();
             #pragma omp for schedule(static,schedule)
@@ -326,7 +326,7 @@ int main(int argc, char  *argv[]) {
         #pragma omp parallel
         {
             int schedule=blockDimension/omp_get_num_threads();
-            #pragma omp for private(neighbors) reduction(+:changed) schedule(static,schedule)
+            #pragma omp for private(neighbors,j) reduction(+:changed) schedule(static,schedule)
             for(i=1;i<blockDimension+1;i+=blockDimension-1){
                 //update the first and last row
                 for(j=1;j<blockDimension+1;j++){
