@@ -14,6 +14,7 @@
 #define DEBUG 1
 //how many loops will hapen
 #define TOTAL_LOOPS 50
+#define FILENAME "input600"
 
 //every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0
@@ -69,7 +70,7 @@ int main(int argc, char  *argv[]) {
     int left_id,right_id;
     int down_left_id,down_id,down_right_id;
 
-    fp=fopen("input.txt","r");
+    fp=fopen(FILENAME,"r");
     if(fp==NULL){
         perror("Fail to open the file");
     }

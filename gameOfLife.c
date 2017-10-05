@@ -7,9 +7,10 @@
 #define ALIVE 'X'
 #define DEAD '.'
 #define EMPTY '?'
-#define DEBUG 1
+#define DEBUG 0
+#define FILENAME "input600"
 //how many loops will hapen
-#define TOTAL_LOOPS 1
+#define TOTAL_LOOPS 10000
 //every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0
 
@@ -65,7 +66,7 @@ int main(int argc, char  *argv[]) {
     int left_id,right_id;
     int down_left_id,down_id,down_right_id;
 
-    fp=fopen("input.txt","r");
+    fp=fopen(FILENAME,"r");
     if(fp==NULL){
         perror("Fail to open the file");
     }
@@ -74,6 +75,7 @@ int main(int argc, char  *argv[]) {
 
 
     MPI_Init(&argc,&argv);
+    double start,finish;
     MPI_Comm_size(MPI_COMM_WORLD, &number_of_process);
     //do the basic calculation for the size of the grid
     tempblocks_per_line=sqrt(number_of_process);
@@ -242,6 +244,8 @@ int main(int argc, char  *argv[]) {
     int cur_loop = 0;
     int changed = 0;//a variable to know if somthing has change
     MPI_Barrier( MPI_COMM_WORLD);
+    start=MPI_Wtime();
+
     int total_changes;//total changes in one loop
     for (cur_loop = 0; cur_loop < TOTAL_LOOPS; cur_loop++) {
         total_changes=0;
@@ -267,12 +271,13 @@ int main(int argc, char  *argv[]) {
         MPI_Recv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,UP_RIGHT,cartesian_comm,MPI_STATUS_IGNORE);//recieve of the up right
         MPI_Recv(&block[0][0],1,MPI_CHAR,up_left_id,UP_LEFT,cartesian_comm,MPI_STATUS_IGNORE);//recieve fo the up left
 
+#if DEBUG==1
         if(my_rank==0){
             printf("\n\n");
             print_board(block,blockDimension+2,stdout);
             fflush(stdout);
         }
-
+#endif
         //calculate the inside
         int neighbors=0;
         // printf("My first update\n");
@@ -380,7 +385,7 @@ int main(int argc, char  *argv[]) {
                 }
             }
         }
-
+#if DEBUG==1
         if(my_rank==0){
             printf("\n\nThe New Block of 0\n\n");
             print_board(newblock,blockDimension+2,stdout);
@@ -389,17 +394,20 @@ int main(int argc, char  *argv[]) {
         if(my_rank!=0){
             printf("(%2d)%2d : %3d\n",cur_loop, my_rank,changed);
         }
-
+#endif
 //no need to add this code if the check is 0
 #if CHECK_FOR_CHANGE>0
         //if in this loop we have to check for change
         if(cur_loop%CHECK_FOR_CHANGE==0){
             MPI_Allreduce(&changed,&total_changes,1,MPI_INT,MPI_SUM,cartesian_comm);
             if(my_rank==0){
+#if DEBUG==1
                 printf("Total changes : %d\n",total_changes);
                 if(total_changes==0){
                     printf("Nooothing chaned on loop %d/%d\n",cur_loop+1,TOTAL_LOOPS);
                 }
+#endif
+
             }
             if(total_changes==0){
                 break;
@@ -411,7 +419,14 @@ int main(int argc, char  *argv[]) {
         temp=newblock;
         newblock=block;
         block=temp;
+        MPI_Waitall(8,send_requests,MPI_STATUSES_IGNORE);
     }
+    //end of the loops print the tim
+    MPI_Barrier(cartesian_comm);
+    finish=MPI_Wtime(); /*stop timer*/
+    double time_elapsed;
+    time_elapsed=finish-start;
+    printf("(%2d proc)Time elpsed for %5d loops:%.4f\n",my_rank,TOTAL_LOOPS,time_elapsed );
 //write the output to a file
     //take the needed part of the board(not the ghost-edges)
     char** final_board=malloc(sizeof(char*)*blockDimension);
@@ -474,5 +489,6 @@ int main(int argc, char  *argv[]) {
     // free(block);
     // }
     MPI_Finalize();
+
     return 0;
 }
