@@ -314,7 +314,6 @@ int main(int argc, char  *argv[]) {
         }
         MPI_Status stats[8];
         MPI_Waitall(8, recv_requests,stats);
-        MPI_Waitall(8, send_requests,stats);
         //updates the outer part
         //the i takes just two values: 1 , blockDimension
         //the j takes all the values from [1,blockDimension]
@@ -398,6 +397,8 @@ int main(int argc, char  *argv[]) {
         }
 #endif
 //no need to add this code if the check is 0
+        MPI_Waitall(8, send_requests,stats);
+
 #if CHECK_FOR_CHANGE>0
         //if in this loop we have to check for change
         if(cur_loop%CHECK_FOR_CHANGE==0){
