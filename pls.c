@@ -409,6 +409,8 @@ int main(int argc, char  *argv[]) {
         }
 #endif
 
+MPI_Waitall(8, send_requests,stats);
+
 //no need to add this code if the check is 0
 #if CHECK_FOR_CHANGE>0
         //if in this loop we have to check for change
