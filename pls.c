@@ -13,7 +13,7 @@
 #define EMPTY '?'
 #define DEBUG 0
 //how many loops will hapen
-#define TOTAL_LOOPS 10000
+#define TOTAL_LOOPS 100
 #define FILENAME "input120"
 
 //every how many loops we have to check for a change (if 0 no check at all)
@@ -246,6 +246,7 @@ int main(int argc, char  *argv[]) {
     int cur_loop = 0;
     int changed = 0;//a variable to know if somthing has change
     MPI_Barrier( MPI_COMM_WORLD);
+    double start=MPI_Wtime();
     int total_changes;//total changes in one loop
     for (cur_loop = 0; cur_loop < TOTAL_LOOPS; cur_loop++) {
         total_changes=0;
@@ -272,20 +273,17 @@ int main(int argc, char  *argv[]) {
         MPI_Irecv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,UP_RIGHT,cartesian_comm,&recv_requests[6]);//recieve of the up right
         MPI_Irecv(&block[0][0],1,MPI_CHAR,up_left_id,UP_LEFT,cartesian_comm,&recv_requests[7]);//recieve fo the up left
 
-        #if DEBUG==1
-                if(my_rank==0){
-                    printf("\n\n");
-                    print_board(block,blockDimension+2,stdout);
-                    fflush(stdout);
-                }
-        #endif
+#if DEBUG==1
+        if(my_rank==0){
+            printf("\n\n");
+            print_board(block,blockDimension+2,stdout);
+            fflush(stdout);
+        }
+#endif
 
         //calculate the inside
         int neighbors=0;
-        #pragma omp parallel private(neighbors,j) reduction(+:changed)
-        {
-            int schedule=blockDimension/omp_get_num_threads();
-            #pragma omp for schedule(static,schedule)
+            #pragma omp parallel for collapse(2) private(neighbors,i,j) reduction(+:changed)
             for(i=2;i<blockDimension;i++){
 
                 for(j=2;j<blockDimension;j++){
@@ -318,7 +316,7 @@ int main(int argc, char  *argv[]) {
                     }
                 }
             }
-        }
+
         // printf("My first update\n");
 
         MPI_Status stats[8];
@@ -326,10 +324,8 @@ int main(int argc, char  *argv[]) {
         //updates the outer part
         //the i takes just two values: 1 , blockDimension
         //the j takes all the values from [1,blockDimension]
-        #pragma omp parallel private(neighbors,j) reduction(+:changed)
-        {
-            int schedule=blockDimension/omp_get_num_threads();
-            #pragma omp for  schedule(static,schedule)
+
+            #pragma omp parallel for private(neighbors,i,j) reduction(+:changed) collapse(2)
             for(i=1;i<blockDimension+1;i+=blockDimension-1){
                 //update the first and last row
                 for(j=1;j<blockDimension+1;j++){
@@ -367,6 +363,9 @@ int main(int argc, char  *argv[]) {
                 //this updates the first and last column
                 //you don't actual need a second loop, you can just add it to the up loop
                 //(check the corerners twice, not a problem)
+            }
+            #pragma omp parallel for private(neighbors,i,j) reduction(+:changed) collapse(2)
+            for(i=1;i<blockDimension+1;i+=blockDimension-1){
                 for(j=1;j<blockDimension+1;j++){
                     neighbors=0;
                     if(block[j-1][i-1]==ALIVE)neighbors++;
@@ -399,18 +398,16 @@ int main(int argc, char  *argv[]) {
                 }
             }
 
+#if DEBUG==1
+        if(my_rank==0){
+            printf("\n\nThe New Block of 0\n\n");
+            print_board(newblock,blockDimension+2,stdout);
+            printf("\n\n");
         }
-
-        #if DEBUG==1
-                if(my_rank==0){
-                    printf("\n\nThe New Block of 0\n\n");
-                    print_board(newblock,blockDimension+2,stdout);
-                    printf("\n\n");
-                }
-                if(my_rank!=0){
-                    printf("(%2d)%2d : %3d\n",cur_loop, my_rank,changed);
-                }
-        #endif
+        if(my_rank!=0){
+            printf("(%2d)%2d : %3d\n",cur_loop, my_rank,changed);
+        }
+#endif
 
 //no need to add this code if the check is 0
 #if CHECK_FOR_CHANGE>0
@@ -434,6 +431,11 @@ int main(int argc, char  *argv[]) {
         newblock=block;
         block=temp;
     }
+
+    double finish=MPI_Wtime(); /*stop timer*/
+    double time_elapsed;
+    time_elapsed=finish-start;
+    printf("(%2d proc)Time elpsed for %5d loops:%.4f\n",my_rank,TOTAL_LOOPS,time_elapsed );
     //write the output to a file
         //take the needed part of the board(not the ghost-edges)
         char** final_board=malloc(sizeof(char*)*blockDimension);
