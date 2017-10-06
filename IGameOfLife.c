@@ -8,8 +8,9 @@
 #define DEAD '.'
 #define EMPTY '?'
 #define DEBUG 0
-#define FILENAME "input360"
+#define FILENAME "input120"
 //how many loops will hapen
+
 #define TOTAL_LOOPS 10000
 //every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0

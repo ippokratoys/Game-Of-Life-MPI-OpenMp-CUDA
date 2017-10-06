@@ -11,9 +11,10 @@
 #define ALIVE 'X'
 #define DEAD '.'
 #define EMPTY '?'
-#define DEBUG 1
+#define DEBUG 0
 //how many loops will hapen
-#define TOTAL_LOOPS 50
+#define TOTAL_LOOPS 10000
+#define FILENAME "input120"
 
 //every how many loops we have to check for a change (if 0 no check at all)
 #define CHECK_FOR_CHANGE 0
@@ -69,7 +70,7 @@ int main(int argc, char  *argv[]) {
     int left_id,right_id;
     int down_left_id,down_id,down_right_id;
 
-    fp=fopen("input.txt","r");
+    fp=fopen(FILENAME,"r");
     if(fp==NULL){
         perror("Fail to open the file");
     }
@@ -271,15 +272,17 @@ int main(int argc, char  *argv[]) {
         MPI_Irecv(&block[0][blockDimension+1],1,MPI_CHAR,up_right,UP_RIGHT,cartesian_comm,&recv_requests[6]);//recieve of the up right
         MPI_Irecv(&block[0][0],1,MPI_CHAR,up_left_id,UP_LEFT,cartesian_comm,&recv_requests[7]);//recieve fo the up left
 
-        if(my_rank==0){
-            printf("\n\n");
-            print_board(block,blockDimension+2,stdout);
-            fflush(stdout);
-        }
+        #if DEBUG==1
+                if(my_rank==0){
+                    printf("\n\n");
+                    print_board(block,blockDimension+2,stdout);
+                    fflush(stdout);
+                }
+        #endif
 
         //calculate the inside
         int neighbors=0;
-        #pragma omp parallel private(neighbors) reduction(+:changed)
+        #pragma omp parallel private(neighbors,j) reduction(+:changed)
         {
             int schedule=blockDimension/omp_get_num_threads();
             #pragma omp for schedule(static,schedule)
@@ -323,10 +326,10 @@ int main(int argc, char  *argv[]) {
         //updates the outer part
         //the i takes just two values: 1 , blockDimension
         //the j takes all the values from [1,blockDimension]
-        #pragma omp parallel
+        #pragma omp parallel private(neighbors,j) reduction(+:changed)
         {
             int schedule=blockDimension/omp_get_num_threads();
-            #pragma omp for private(neighbors) reduction(+:changed) schedule(static,schedule)
+            #pragma omp for  schedule(static,schedule)
             for(i=1;i<blockDimension+1;i+=blockDimension-1){
                 //update the first and last row
                 for(j=1;j<blockDimension+1;j++){
@@ -398,14 +401,16 @@ int main(int argc, char  *argv[]) {
 
         }
 
-        if(my_rank==0){
-            printf("\n\nThe New Block of 0\n\n");
-            print_board(newblock,blockDimension+2,stdout);
-            printf("\n\n");
-        }
-        if(my_rank!=0){
-            printf("(%2d)%2d : %3d\n",cur_loop, my_rank,changed);
-        }
+        #if DEBUG==1
+                if(my_rank==0){
+                    printf("\n\nThe New Block of 0\n\n");
+                    print_board(newblock,blockDimension+2,stdout);
+                    printf("\n\n");
+                }
+                if(my_rank!=0){
+                    printf("(%2d)%2d : %3d\n",cur_loop, my_rank,changed);
+                }
+        #endif
 
 //no need to add this code if the check is 0
 #if CHECK_FOR_CHANGE>0
